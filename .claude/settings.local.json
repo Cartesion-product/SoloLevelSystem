@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pandoc:*)",
+      "Bash(git -C \"D:\\\\PythonWorkSpace\\\\SoloLevelSystem\" log --oneline --all)",
+      "Bash(pip install:*)",
+      "Bash(python -c \" import docx doc = docx.Document\\(''design-doc/solo_leveling_system_design.docx''\\) for p in doc.paragraphs: print\\(p.text\\) \")",
+      "Bash(python -c:*)",
+      "WebSearch",
+      "WebFetch(domain:ollama.com)",
+      "Bash(ollama --version:*)",
+      "Bash(ollama list:*)",
+      "Bash(ollama pull:*)",
+      "Bash(D:\\\\Anaconda_env\\\\envs\\\\sololevel-system\\\\python.exe -m pytest:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(where:*)",
+      "Bash(conda run:*)",
+      "Bash(set:*)",
+      "Bash(pip show:*)",
+      "Bash(D:\\\\Python\\\\311\\\\python.exe -m pip:*)",
+      "Bash(\"D:\\\\Anaconda\\\\python.exe\" -m pip show pytest)",
+      "Bash(\"D:\\\\Anaconda\\\\python.exe\" -m pip show pytest-asyncio asyncpg sqlalchemy fastapi bcrypt)",
+      "Bash(\"D:\\\\Anaconda\\\\Scripts\\\\conda.exe\" env list:*)",
+      "Bash(\"D:\\\\Anaconda_env\\\\envs\\\\sololevel-system\\\\python.exe\" scripts/db_manage.py status)",
+      "Bash(\"D:\\\\Anaconda_env\\\\envs\\\\sololevel-system\\\\python.exe\" scripts/db_manage.py reset -y)",
+      "Bash(\"D:\\\\Anaconda_env\\\\envs\\\\sololevel-system\\\\python.exe\":*)",
+      "Bash(dir /b .venvScriptspytest*)",
+      "Bash(dir:*)",
+      "Bash(ls:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx vue-tsc:*)",
+      "Bash(npm install:*)",
+      "Bash(alembic upgrade:*)",
+      "Bash(npx vite build)"
+    ]
+  }
+}

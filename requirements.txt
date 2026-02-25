@@ -1,0 +1,46 @@
+# --- Core ---
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic[email]==2.10.4
+pydantic-settings==2.7.1
+
+# --- Database ---
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+alembic==1.14.1
+greenlet==3.1.1
+
+# --- Redis ---
+redis[hiredis]==5.2.1
+
+# --- Vector DB ---
+qdrant-client==1.12.1
+
+# --- LLM / Agent ---
+langchain==0.3.14
+langchain-openai==0.3.0
+langgraph==0.2.60
+
+# --- Auth ---
+python-jose[cryptography]==3.3.0
+bcrypt==4.2.1
+python-multipart==0.0.20
+
+# --- File Parsing ---
+PyMuPDF==1.25.1
+python-docx==1.1.2
+
+# --- Async Tasks ---
+celery[redis]==5.4.0
+
+# --- SSE ---
+sse-starlette==2.2.1
+
+# --- Utilities ---
+httpx==0.28.1
+python-dotenv==1.0.1
+
+# --- Testing ---
+pytest==8.3.4
+pytest-asyncio==0.25.0
+pytest-cov==6.0.0
