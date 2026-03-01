@@ -1,0 +1,26 @@
+{
+  "mode": "system_design",
+  "scenarios": [
+    {
+      "name": "url_shortener",
+      "title": "设计短链接服务",
+      "description": "设计一个类似 bit.ly 的短链接服务，支持创建、重定向和统计分析。",
+      "expected_components": ["哈希生成", "KV存储", "缓存层", "负载均衡", "统计服务"],
+      "difficulty": "medium"
+    },
+    {
+      "name": "chat_system",
+      "title": "设计即时通讯系统",
+      "description": "设计一个支持一对一和群聊的即时通讯系统。",
+      "expected_components": ["WebSocket网关", "消息队列", "用户状态管理", "消息存储", "推送服务"],
+      "difficulty": "hard"
+    },
+    {
+      "name": "newsfeed",
+      "title": "设计社交信息流",
+      "description": "设计一个类似微信朋友圈的社交信息流系统。",
+      "expected_components": ["推拉模型", "时间线服务", "内容分发", "缓存策略", "排序算法"],
+      "difficulty": "hard"
+    }
+  ]
+}

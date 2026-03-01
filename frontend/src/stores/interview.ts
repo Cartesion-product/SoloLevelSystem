@@ -37,13 +37,16 @@ export const useInterviewStore = defineStore('interview', () => {
     isStreaming.value = true
 
     let assistantContent = ''
-    messages.value.push({ role: 'assistant', content: '' })
-    const assistantIdx = messages.value.length - 1
+    let assistantIdx = -1
 
     try {
       for await (const event of streamChat(sessionId.value, text)) {
         switch (event.event) {
           case 'chunk':
+            if (assistantIdx === -1) {
+              messages.value.push({ role: 'assistant', content: '' })
+              assistantIdx = messages.value.length - 1
+            }
             assistantContent += event.data.content || ''
             messages.value[assistantIdx].content = assistantContent
             break
@@ -53,6 +56,13 @@ export const useInterviewStore = defineStore('interview', () => {
           case 'session_end':
             isSessionActive.value = false
             metadata.value = { ...metadata.value, report: event.data }
+            break
+          case 'error':
+            if (assistantIdx === -1) {
+              messages.value.push({ role: 'assistant', content: '' })
+              assistantIdx = messages.value.length - 1
+            }
+            messages.value[assistantIdx].content = `[错误] ${event.data.message || '服务器异常，请重试'}`
             break
         }
       }

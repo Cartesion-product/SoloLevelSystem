@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "Solo Leveling System"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
+    LOG_LEVEL: str = "INFO"
     SECRET_KEY: str = "change-me-in-production"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
     HOST: str = "0.0.0.0"
@@ -33,14 +34,20 @@ class Settings(BaseSettings):
     QDRANT_PORT: int = 6333
     QDRANT_API_KEY: str | None = None
 
+    # --- MongoDB ---
+    MONGO_URL: str = "mongodb://localhost:27017"
+    MONGO_DB_NAME: str = "solo_leveling"
+
     # --- LLM ---
-    LLM_PROVIDER: Literal["openai", "deepseek"] = "openai"
+    LLM_PROVIDER: Literal["openai", "deepseek", "anthropic"] = "openai"
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o"
     OPENAI_BASE_URL: str | None = None
     DEEPSEEK_API_KEY: str = ""
     DEEPSEEK_MODEL: str = "deepseek-chat"
     DEEPSEEK_BASE_URL: str = "https://api.deepseek.com/v1"
+    ANTHROPIC_API_KEY: str = ""
+    ANTHROPIC_MODEL: str = "claude-opus-4-6"
 
     # --- Embedding ---
     EMBEDDING_PROVIDER: Literal["openai", "deepseek", "ollama"] = "openai"

@@ -147,3 +147,15 @@ def mock_llm():
     mock.chat = AsyncMock(return_value='{"basic_info": {"name": "Test"}, "skills": {}, "projects": [], "work_experience": []}')
     mock.stream_chat = AsyncMock()
     return mock
+
+
+# ---- Mock MongoDB ----
+
+@pytest_asyncio.fixture
+async def mongo_db():
+    """Provide a mongomock-motor database for workspace tests."""
+    from mongomock_motor import AsyncMongoMockClient
+    client = AsyncMongoMockClient()
+    db = client["test_solo_leveling"]
+    yield db
+    client.close()

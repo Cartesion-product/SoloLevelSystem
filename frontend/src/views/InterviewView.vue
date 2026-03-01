@@ -58,7 +58,7 @@
             <div class="msg__text">{{ msg.content }}</div>
           </div>
         </div>
-        <div v-if="interviewStore.isStreaming" class="msg msg--assistant">
+        <div v-if="interviewStore.isStreaming && !lastMessageHasContent" class="msg msg--assistant">
           <div class="msg__avatar msg__avatar--assistant">AI</div>
           <div class="msg__bubble msg__bubble--assistant">
             <div class="typing">
@@ -92,9 +92,14 @@
       <div v-if="!interviewStore.isSessionActive && interviewStore.metadata.report" class="report">
         <div class="report__header">
           <h3 class="report__title">面试报告</h3>
-          <div class="report__score-ring">
-            <span class="report__score-value">{{ interviewStore.metadata.report.overall_score ?? '-' }}</span>
-            <span class="report__score-unit">/10</span>
+          <div class="report__actions">
+            <el-button size="small" round @click="handleDownloadTranscript">
+              下载面试记录
+            </el-button>
+            <div class="report__score-ring">
+              <span class="report__score-value">{{ interviewStore.metadata.report.overall_score ?? '-' }}</span>
+              <span class="report__score-unit">/10</span>
+            </div>
           </div>
         </div>
         <div class="report__body">
@@ -121,10 +126,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useInterviewStore } from '@/stores/interview'
-import { resumeApi, jobApi } from '@/api'
+import { resumeApi, jobApi, interviewApi } from '@/api'
 
 const interviewStore = useInterviewStore()
 
@@ -136,6 +141,13 @@ const maxQuestions = ref(8)
 const starting = ref(false)
 const inputMessage = ref('')
 const messagesContainer = ref<HTMLElement>()
+
+const lastMessageHasContent = computed(() => {
+  const msgs = interviewStore.messages
+  if (msgs.length === 0) return false
+  const last = msgs[msgs.length - 1]
+  return last.role === 'assistant' && last.content.length > 0
+})
 
 onMounted(async () => {
   interviewStore.reset()
@@ -179,6 +191,21 @@ async function handleSend() {
 async function handleEnd() {
   await interviewStore.endSession()
   ElMessage.info('面试已结束')
+}
+
+async function handleDownloadTranscript() {
+  try {
+    const res = await interviewApi.downloadTranscript(interviewStore.sessionId)
+    const blob = new Blob([res.data], { type: 'application/pdf' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `interview_${interviewStore.sessionId.slice(0, 8)}.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch {
+    ElMessage.error('下载面试记录失败')
+  }
 }
 </script>
 
@@ -396,6 +423,12 @@ async function handleEnd() {
   font-size: 16px;
   font-weight: 700;
   color: var(--color-text);
+}
+
+.report__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .report__score-ring {

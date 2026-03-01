@@ -6,7 +6,7 @@ import uuid
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.schemas.knowledge import KnowledgeDocListResponse, KnowledgeDocResponse
+from app.api.schemas.knowledge import KnowledgeDocListResponse, KnowledgeDocResponse, KnowledgeDocStatusResponse, KnowledgeDocDetailResponse
 from app.config import get_settings
 from app.dependencies import get_current_user
 from app.domain.interview.models import User
@@ -59,8 +59,28 @@ async def upload_document(
         doc_type=doc.doc_type,
         chunk_count=doc.chunk_count,
         status=doc.status,
+        error_message=doc.error_message,
         domain_tags=doc.domain_tags,
         created_at=doc.created_at,
+    )
+
+
+@router.get("/documents/{doc_id}/status", response_model=KnowledgeDocStatusResponse)
+async def get_document_status(
+    doc_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lightweight status polling endpoint for a single document."""
+    repo = KnowledgeDocumentRepository(db)
+    doc = await repo.get_by_id(uuid.UUID(doc_id))
+    if not doc or doc.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return KnowledgeDocStatusResponse(
+        id=str(doc.id),
+        status=doc.status,
+        error_message=doc.error_message,
+        chunk_count=doc.chunk_count,
     )
 
 
@@ -79,11 +99,61 @@ async def list_documents(
                 doc_type=d.doc_type,
                 chunk_count=d.chunk_count,
                 status=d.status,
+                error_message=d.error_message,
                 domain_tags=d.domain_tags,
                 created_at=d.created_at,
             )
             for d in docs
         ]
+    )
+
+
+@router.get("/documents/{doc_id}", response_model=KnowledgeDocDetailResponse)
+async def get_document_detail(
+    doc_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get document details including extracted text chunks."""
+    repo = KnowledgeDocumentRepository(db)
+    doc = await repo.get_by_id(uuid.UUID(doc_id))
+    if not doc or doc.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Document not found")
+        
+    # Get chunks from vector store if processing finished
+    from app.infrastructure.vector_store import get_chunks_by_doc_id
+    from app.api.schemas.knowledge import KnowledgeChunkResponse
+    
+    chunks = []
+    if doc.status == "ready":
+        try:
+            q_chunks = get_chunks_by_doc_id(KNOWLEDGE_CHUNKS_COLLECTION, doc_id)
+            for chunk in q_chunks:
+                payload = chunk.get("payload", {})
+                chunks.append(
+                    KnowledgeChunkResponse(
+                        id=chunk["id"],
+                        content=payload.get("content", ""),
+                        source_type=payload.get("source_type"),
+                    )
+                )
+        except Exception as e:
+            # If Qdrant is down or throws error, we just return empty chunks
+            import logging
+            logging.getLogger(__name__).warning("Failed to fetch chunks from Qdrant: %s", e)
+
+    return KnowledgeDocDetailResponse(
+        document=KnowledgeDocResponse(
+            id=str(doc.id),
+            doc_name=doc.doc_name,
+            doc_type=doc.doc_type,
+            chunk_count=doc.chunk_count,
+            status=doc.status,
+            error_message=doc.error_message,
+            domain_tags=doc.domain_tags,
+            created_at=doc.created_at,
+        ),
+        chunks=chunks
     )
 
 

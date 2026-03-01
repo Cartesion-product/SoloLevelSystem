@@ -1,0 +1,26 @@
+{
+  "mode": "technical",
+  "categories": [
+    {
+      "name": "data_structures",
+      "questions": [
+        {"text": "解释一下 HashMap 的底层实现原理，以及如何处理哈希冲突？", "difficulty": "medium", "expected_points": ["哈希函数", "冲突解决策略", "扩容机制"]},
+        {"text": "在什么场景下你会选择红黑树而不是哈希表？", "difficulty": "hard", "expected_points": ["有序性需求", "时间复杂度对比", "实际应用场景"]}
+      ]
+    },
+    {
+      "name": "system_design_basics",
+      "questions": [
+        {"text": "如果让你设计一个短链接服务，你会怎么做？", "difficulty": "medium", "expected_points": ["哈希策略", "存储选型", "缓存设计", "高并发处理"]},
+        {"text": "描述一下你理解的微服务架构，以及何时不该用微服务？", "difficulty": "medium", "expected_points": ["服务拆分原则", "通信机制", "复杂度权衡"]}
+      ]
+    },
+    {
+      "name": "coding_practices",
+      "questions": [
+        {"text": "你在日常开发中如何保证代码质量？", "difficulty": "easy", "expected_points": ["测试策略", "代码审查", "CI/CD", "重构习惯"]},
+        {"text": "描述一次你做过的最有价值的性能优化。", "difficulty": "hard", "expected_points": ["问题定位", "优化策略", "量化结果"]}
+      ]
+    }
+  ]
+}

@@ -109,7 +109,7 @@ const authStore = useAuthStore()
 const activeTab = ref('login')
 const loading = ref(false)
 
-const loginForm = ref({ email: '', password: '' })
+const loginForm = ref({ email: '1804806181@qq.com', password: '123123' })
 const registerForm = ref({ username: '', email: '', password: '' })
 
 async function handleLogin() {

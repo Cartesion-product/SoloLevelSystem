@@ -19,6 +19,7 @@ class KnowledgeDocument(Base):
     doc_type: Mapped[str | None] = mapped_column(String(50))
     file_url: Mapped[str | None] = mapped_column(Text)
     chunk_count: Mapped[int] = mapped_column(Integer, default=0)
-    status: Mapped[str] = mapped_column(String(50), default="processing")
+    status: Mapped[str] = mapped_column(String(50), default="pending")
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     domain_tags: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

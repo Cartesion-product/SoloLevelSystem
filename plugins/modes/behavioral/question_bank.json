@@ -1,0 +1,26 @@
+{
+  "mode": "behavioral",
+  "categories": [
+    {
+      "name": "teamwork",
+      "questions": [
+        {"text": "请描述一次你在团队中解决冲突的经历。", "difficulty": "medium", "expected_points": ["冲突识别", "沟通策略", "结果导向"]},
+        {"text": "说说你如何在团队中推动一个不受欢迎但必要的变更？", "difficulty": "hard", "expected_points": ["变更管理", "影响力", "决策过程"]}
+      ]
+    },
+    {
+      "name": "leadership",
+      "questions": [
+        {"text": "描述一次你带领团队完成紧急项目的经历。", "difficulty": "medium", "expected_points": ["优先级管理", "资源分配", "压力管理"]},
+        {"text": "你如何培养和指导初级团队成员？", "difficulty": "easy", "expected_points": ["指导策略", "反馈机制", "成长追踪"]}
+      ]
+    },
+    {
+      "name": "problem_solving",
+      "questions": [
+        {"text": "描述一个你发现并解决了一个别人没有注意到的问题的情况。", "difficulty": "hard", "expected_points": ["观察力", "主动性", "系统思维"]},
+        {"text": "谈谈你在资源有限的情况下如何做出权衡决策？", "difficulty": "medium", "expected_points": ["权衡分析", "创造性解决方案", "结果评估"]}
+      ]
+    }
+  ]
+}

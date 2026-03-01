@@ -9,6 +9,8 @@ from langchain_core.messages import AIMessage, HumanMessage
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
+from fastapi.responses import Response
+
 from app.agents.graph import interview_graph
 from app.agents.state import InterviewState
 from app.api.schemas.interviews import (
@@ -17,6 +19,7 @@ from app.api.schemas.interviews import (
     InterviewSessionResponse,
     InterviewStartRequest,
 )
+from app.core.logger import get_logger
 from app.dependencies import get_current_user
 from app.domain.capability.repository import SkillTreeRepository
 from app.domain.interview.models import User
@@ -25,8 +28,12 @@ from app.domain.interview.repository import (
     ResumeRepository,
     TargetJobRepository,
 )
+from app.domain.workspace.service import WorkspaceManager
 from app.infrastructure.cache import cache_get, cache_set
 from app.infrastructure.database import get_db
+from app.infrastructure.pdf_generator import generate_transcript_pdf
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/interviews", tags=["interviews"])
 
@@ -122,6 +129,22 @@ async def start_interview(
             first_msg = m.content
             break
 
+    # Save first AI message to transcript
+    if first_msg:
+        await session_repo.update(
+            session.id,
+            transcript=[{"role": "ai", "content": first_msg}],
+        )
+
+    # Initialize workspace (best-effort, requires MongoDB)
+    try:
+        from app.infrastructure.mongodb import get_mongo_db
+        mongo_db = get_mongo_db()
+        workspace_mgr = WorkspaceManager(mongo_db)
+        await workspace_mgr.initialize_from_v1(str(user.id), db)
+    except Exception as ws_err:
+        logger.warning(f"Failed to initialize workspace: {ws_err}")
+
     return InterviewSessionResponse(
         id=str(session.id),
         status=session.status,
@@ -159,75 +182,104 @@ async def chat(
     state["messages"] = state.get("messages", []) + [HumanMessage(content=body.message)]
 
     async def event_generator():
-        # SSE: thinking event
-        yield {"event": "thinking", "data": json.dumps({"status": "evaluating"})}
+        try:
+            # SSE: thinking event
+            yield {"event": "thinking", "data": json.dumps({"status": "evaluating"})}
 
-        # Run evaluator on user's answer
-        from app.agents.nodes.evaluator import evaluator_node
-        eval_result = await evaluator_node(state)
-        for k, v in eval_result.items():
-            state[k] = v
+            # Run evaluator on user's answer
+            from app.agents.nodes.evaluator import evaluator_node
+            eval_result = await evaluator_node(state)
+            for k, v in eval_result.items():
+                state[k] = v
 
-        # SSE: metadata
-        yield {
-            "event": "metadata",
-            "data": json.dumps({
-                "phase": state.get("phase"),
-                "difficulty": state.get("difficulty"),
-                "question_count": state.get("question_count"),
-                "stress_level": state.get("stress_level"),
-            }),
-        }
+            # SSE: metadata
+            yield {
+                "event": "metadata",
+                "data": json.dumps({
+                    "phase": state.get("phase"),
+                    "difficulty": state.get("difficulty"),
+                    "question_count": state.get("question_count"),
+                    "stress_level": state.get("stress_level"),
+                }),
+            }
 
-        # Check if should end
-        if state.get("question_count", 0) >= state.get("max_questions", 8):
-            state["next_action"] = "end"
-            state["phase"] = "feedback"
+            # Check if should end
+            if state.get("question_count", 0) >= state.get("max_questions", 8):
+                state["next_action"] = "end"
+                state["phase"] = "feedback"
 
-        # Run strategist → interviewer
-        yield {"event": "thinking", "data": json.dumps({"status": "generating"})}
+            # Run strategist → interviewer
+            yield {"event": "thinking", "data": json.dumps({"status": "generating"})}
 
-        result = await interview_graph.ainvoke(state)
+            result = await interview_graph.ainvoke(state)
 
-        # Extract AI response
-        ai_messages = [m for m in result.get("messages", []) if isinstance(m, AIMessage)]
-        if ai_messages:
-            last_ai = ai_messages[-1].content
-            # Stream chunks
-            chunk_size = 20
-            for i in range(0, len(last_ai), chunk_size):
-                yield {"event": "chunk", "data": json.dumps({"content": last_ai[i:i + chunk_size]})}
+            # Extract AI response
+            ai_messages = [m for m in result.get("messages", []) if isinstance(m, AIMessage)]
+            last_ai_content = ""
+            if ai_messages:
+                last_ai_content = ai_messages[-1].content
+                # Stream chunks
+                chunk_size = 20
+                for i in range(0, len(last_ai_content), chunk_size):
+                    yield {"event": "chunk", "data": json.dumps({"content": last_ai_content[i:i + chunk_size]})}
 
-        # Update state
-        state_to_cache = _serialize_state(result)
-        await cache_set(f"{SESSION_STATE_PREFIX}{session_id}", state_to_cache, SESSION_TTL)
+            # Update state
+            state_to_cache = _serialize_state(result)
+            await cache_set(f"{SESSION_STATE_PREFIX}{session_id}", state_to_cache, SESSION_TTL)
 
-        # Update DB
-        await session_repo.update(
-            uuid.UUID(session_id),
-            question_count=result.get("question_count", 0),
-        )
+            # Save transcript: user answer + AI question
+            transcript_entries = [
+                {"role": "user", "content": body.message},
+            ]
+            if last_ai_content:
+                transcript_entries.append({"role": "ai", "content": last_ai_content})
+            await _append_transcript(session_repo, session_id, transcript_entries)
 
-        if result.get("phase") == "feedback" or result.get("next_action") == "end":
-            # Session complete
-            summary = {}
-            if result.get("session_summary"):
-                try:
-                    summary = json.loads(result["session_summary"])
-                except (json.JSONDecodeError, TypeError):
-                    summary = {"summary_text": result.get("session_summary", "")}
-
+            # Update DB
             await session_repo.update(
                 uuid.UUID(session_id),
-                status="completed",
-                summary=summary,
-                completed_at=datetime.now(timezone.utc),
+                question_count=result.get("question_count", 0),
             )
-            yield {"event": "session_end", "data": json.dumps(summary)}
-        else:
-            yield {"event": "done", "data": json.dumps({"status": "ok"})}
 
-    return EventSourceResponse(event_generator())
+            if result.get("phase") == "feedback" or result.get("next_action") == "end":
+                # Session complete
+                summary = {}
+                if result.get("session_summary"):
+                    try:
+                        summary = json.loads(result["session_summary"])
+                    except (json.JSONDecodeError, TypeError):
+                        summary = {"summary_text": result.get("session_summary", "")}
+
+                await session_repo.update(
+                    uuid.UUID(session_id),
+                    status="completed",
+                    summary=summary,
+                    completed_at=datetime.now(timezone.utc),
+                )
+
+                # Auto-save PDF transcript
+                try:
+                    await _auto_save_transcript_pdf(session_repo, session_id, str(user.id))
+                except Exception as pdf_err:
+                    logger.warning(f"Failed to auto-save transcript PDF: {pdf_err}")
+
+                # Update workspace (best-effort)
+                try:
+                    from app.infrastructure.mongodb import get_mongo_db
+                    mongo_db = get_mongo_db()
+                    workspace_mgr = WorkspaceManager(mongo_db)
+                    await workspace_mgr.update_after_session(str(user.id), result)
+                except Exception as ws_err:
+                    logger.warning(f"Failed to update workspace after session: {ws_err}")
+
+                yield {"event": "session_end", "data": json.dumps(summary)}
+            else:
+                yield {"event": "done", "data": json.dumps({"status": "ok"})}
+        except Exception as e:
+            logger.error(f"Interview SSE error: {e}", exc_info=True)
+            yield {"event": "error", "data": json.dumps({"message": str(e)})}
+
+    return EventSourceResponse(event_generator(), ping=15)
 
 
 @router.post("/{session_id}/end", response_model=InterviewSessionResponse)
@@ -304,3 +356,70 @@ def _deserialize_state(data: dict) -> dict:
             for m in state["messages"]
         ]
     return state
+
+
+async def _append_transcript(
+    session_repo: InterviewSessionRepository,
+    session_id: str,
+    entries: list[dict],
+) -> None:
+    """Append entries to the session's transcript JSONB field."""
+    session = await session_repo.get_by_id(uuid.UUID(session_id))
+    if not session:
+        return
+    existing = session.transcript or []
+    existing.extend(entries)
+    await session_repo.update(uuid.UUID(session_id), transcript=existing)
+
+
+async def _auto_save_transcript_pdf(
+    session_repo: InterviewSessionRepository,
+    session_id: str,
+    user_id: str,
+) -> None:
+    """Generate and save transcript PDF to disk."""
+    from app.config import BASE_DIR
+
+    session = await session_repo.get_by_id(uuid.UUID(session_id))
+    if not session or not session.transcript:
+        return
+
+    pdf_bytes = generate_transcript_pdf(
+        transcript=session.transcript,
+        session_date=session.created_at,
+    )
+
+    pdf_dir = BASE_DIR / "uploads" / "transcripts" / user_id
+    pdf_dir.mkdir(parents=True, exist_ok=True)
+    pdf_path = pdf_dir / f"{session_id}.pdf"
+    pdf_path.write_bytes(pdf_bytes)
+    logger.info(f"Transcript PDF saved: {pdf_path}")
+
+
+@router.get("/{session_id}/transcript/pdf")
+async def download_transcript_pdf(
+    session_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Download the interview transcript as a PDF."""
+    session_repo = InterviewSessionRepository(db)
+    session = await session_repo.get_by_id(uuid.UUID(session_id))
+    if not session or session.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    transcript = session.transcript or []
+    if not transcript:
+        raise HTTPException(status_code=404, detail="No transcript available")
+
+    pdf_bytes = generate_transcript_pdf(
+        transcript=transcript,
+        session_date=session.created_at,
+    )
+
+    filename = f"interview_{session_id[:8]}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

@@ -80,8 +80,11 @@ class InterviewSession(Base):
     session_type: Mapped[str] = mapped_column(String(50), nullable=False, default="simulated")
     status: Mapped[str] = mapped_column(String(50), default="in_progress")
     summary: Mapped[dict | None] = mapped_column(JSONB)
+    transcript: Mapped[list | None] = mapped_column(JSONB, default=list)
     question_count: Mapped[int] = mapped_column(Integer, default=0)
     duration_seconds: Mapped[int | None] = mapped_column(Integer)
+    mode: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    target_company: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     completed_at: Mapped[datetime | None] = mapped_column(DateTime)
 

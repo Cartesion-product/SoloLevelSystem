@@ -11,7 +11,7 @@ from app.core.logger import get_logger, setup_logging
 settings = get_settings()
 
 # Initialize logging before anything else
-setup_logging(level="DEBUG" if settings.DEBUG else "INFO")
+setup_logging(level=settings.LOG_LEVEL)
 logger = get_logger("app.main")
 
 
@@ -27,7 +27,20 @@ async def lifespan(app: FastAPI):
         logger.info("Qdrant collections initialized")
     except Exception as e:
         logger.warning(f"Qdrant not available: {e}")
+
+    # Startup: MongoDB connection
+    from app.infrastructure.mongodb import close_mongo, init_mongo
+
+    try:
+        await init_mongo()
+        logger.info("MongoDB connected")
+    except Exception as e:
+        logger.warning(f"MongoDB not available: {e}")
+
     yield
+
+    # Shutdown: close MongoDB
+    await close_mongo()
     logger.info("Application shutting down...")
 
 
@@ -69,6 +82,13 @@ app.include_router(interviews_router, prefix="/api")
 app.include_router(quests_router, prefix="/api")
 app.include_router(knowledge_router, prefix="/api")
 app.include_router(growth_router, prefix="/api")
+
+# v2 routers
+from app.api.v2.interviews import router as interviews_v2_router  # noqa: E402
+from app.api.v2.workspace import router as workspace_v2_router  # noqa: E402
+
+app.include_router(interviews_v2_router, prefix="/api")
+app.include_router(workspace_v2_router, prefix="/api")
 
 
 if __name__ == "__main__":

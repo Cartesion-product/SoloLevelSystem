@@ -41,6 +41,8 @@ export const interviewApi = {
     api.post('/interviews/start', data, { timeout: 120000 }),
   end: (id: string) => api.post(`/interviews/${id}/end`),
   getReport: (id: string) => api.get(`/interviews/${id}/report`),
+  downloadTranscript: (id: string) =>
+    api.get(`/interviews/${id}/transcript/pdf`, { responseType: 'blob' }),
 }
 
 // Skills
@@ -60,6 +62,8 @@ export const knowledgeApi = {
   upload: (formData: FormData) =>
     api.post('/knowledge/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   list: () => api.get('/knowledge/documents'),
+  getDetail: (id: string) => api.get(`/knowledge/documents/${id}`),
+  getStatus: (id: string) => api.get(`/knowledge/documents/${id}/status`),
   delete: (id: string) => api.delete(`/knowledge/documents/${id}`),
 }
 

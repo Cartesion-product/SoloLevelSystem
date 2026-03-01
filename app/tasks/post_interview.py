@@ -97,8 +97,22 @@ async def _process_session_async(session_id: str, user_id: str, conversation_mes
         db.add(mood)
 
         # 3. Quest generation
-        identified_gaps = state_data.get("identified_gaps", [])
-        skill_tree_snapshot = state_data.get("skill_tree_snapshot", [])
+        # v2 sessions store gaps differently
+        is_v2_session = bool(state_data.get("mode"))
+        if is_v2_session:
+            # Build identified_gaps from v2 round_scores
+            identified_gaps = []
+            for score in state_data.get("round_scores", []):
+                gap = score.get("gap_identified")
+                if gap:
+                    identified_gaps.append({
+                        "skill": gap,
+                        "score": score.get("score", 5),
+                    })
+            skill_tree_snapshot = state_data.get("skill_radar", [])
+        else:
+            identified_gaps = state_data.get("identified_gaps", [])
+            skill_tree_snapshot = state_data.get("skill_tree_snapshot", [])
 
         quests = await generate_quests(identified_gaps, skill_tree_snapshot, llm)
 
@@ -171,3 +185,16 @@ async def _process_session_async(session_id: str, user_id: str, conversation_mes
         # 6. Update Redis cache with recent session summaries
         recent_key = f"recent_summaries:{user_id}"
         await cache_set(recent_key, json.dumps(summary, ensure_ascii=False), 7 * 24 * 3600)
+
+        # 7. v2 session: sync MongoDB workspace → PostgreSQL skill_tree
+        is_v2 = bool(state_data.get("mode"))
+        if is_v2:
+            try:
+                from app.domain.workspace.sync import sync_workspace_to_pg
+                from app.infrastructure.mongodb import get_mongo_db
+
+                mongo_db = get_mongo_db()
+                await sync_workspace_to_pg(user_id, mongo_db, db)
+                await db.commit()
+            except Exception:
+                pass  # MongoDB sync failure shouldn't break the task

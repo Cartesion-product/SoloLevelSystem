@@ -110,3 +110,42 @@ def delete_by_filter(
         collection_name=collection,
         points_selector=Filter(must=must),
     )
+
+
+def get_chunks_by_doc_id(
+    collection: str,
+    doc_id: str,
+    client: QdrantClient | None = None,
+) -> list[dict]:
+    """Fetch all chunks for a given document ID."""
+    if client is None:
+        client = get_qdrant_client()
+
+    qdrant_filter = Filter(
+        must=[FieldCondition(key="doc_id", match=MatchValue(value=doc_id))]
+    )
+    
+    chunks = []
+    offset = None
+    
+    # Use scroll to retrieve all points matching the filter
+    while True:
+        results, offset = client.scroll(
+            collection_name=collection,
+            scroll_filter=qdrant_filter,
+            limit=100,
+            offset=offset,
+            with_payload=True,
+            with_vectors=False,  # We only need the text/metadata
+        )
+        
+        for point in results:
+            chunks.append({
+                "id": str(point.id),
+                "payload": point.payload
+            })
+            
+        if offset is None:
+            break
+            
+    return chunks
